@@ -48,8 +48,9 @@ private:
 
 class GATTRequesterCb : public GATTRequester {
 public:
-    GATTRequesterCb(PyObject* p, std::string address, bool do_connect=true) :
-        GATTRequester(address, do_connect),
+    GATTRequesterCb(PyObject* p, std::string address,
+            bool do_connect=true, std::string device="hci0") :
+        GATTRequester(address, do_connect, device),
         self(p) {
     }
 
@@ -94,24 +95,31 @@ private:
 BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(
         start_advertising, BeaconService::start_advertising, 0, 5)
 
+BOOST_PYTHON_MEMBER_FUNCTION_OVERLOADS(
+        gattrequester_connect, GATTRequester::connect, 0, 3)
+
 BOOST_PYTHON_MODULE(gattlib) {
 
     register_ptr_to_python<GATTRequester*>();
 
-    class_<GATTRequester, boost::noncopyable, GATTRequesterCb>
-            ("GATTRequester", init<std::string, optional<bool> >())
+    class_<GATTRequester, boost::noncopyable, GATTRequesterCb> ("GATTRequester",
+            init<std::string, optional<bool, std::string> >())
 
-            .def("connect", &GATTRequester::connect)
-            .def("is_connected", &GATTRequester::is_connected)
-            .def("disconnect", &GATTRequester::disconnect)
-            .def("read_by_handle", &GATTRequester::read_by_handle)
-            .def("read_by_handle_async", &GATTRequester::read_by_handle_async)
-            .def("read_by_uuid", &GATTRequester::read_by_uuid)
-            .def("read_by_uuid_async", &GATTRequester::read_by_uuid_async)
-            .def("write_by_handle", &GATTRequester::write_by_handle)
-            .def("write_by_handle_async", &GATTRequester::write_by_handle_async)
-            .def("on_notification", &GATTRequesterCb::default_on_notification)
-            .def("on_indication", &GATTRequesterCb::default_on_indication);
+        .def("connect", &GATTRequester::connect)
+        .def("connect", &GATTRequester::connect,
+                gattrequester_connect(
+                    args("wait", "channel_type", "security_level"),
+                    "connects"))
+        .def("is_connected", &GATTRequester::is_connected)
+        .def("disconnect", &GATTRequester::disconnect)
+        .def("read_by_handle", &GATTRequester::read_by_handle)
+        .def("read_by_handle_async", &GATTRequester::read_by_handle_async)
+        .def("read_by_uuid", &GATTRequester::read_by_uuid)
+        .def("read_by_uuid_async", &GATTRequester::read_by_uuid_async)
+        .def("write_by_handle", &GATTRequester::write_by_handle)
+        .def("write_by_handle_async", &GATTRequester::write_by_handle_async)
+        .def("on_notification", &GATTRequesterCb::default_on_notification)
+        .def("on_indication", &GATTRequesterCb::default_on_indication);
 
     register_ptr_to_python<GATTResponse*>();
 
@@ -119,10 +127,10 @@ BOOST_PYTHON_MODULE(gattlib) {
             .def("received", &GATTResponse::received)
             .def("on_response", &GATTResponseCb::default_on_response);
 
-    class_<DiscoveryService>("DiscoveryService", init<std::string>())
+    class_<DiscoveryService>("DiscoveryService", init<optional<std::string> >())
             .def("discover", &DiscoveryService::discover);
 
-    class_<BeaconService>("BeaconService", init<std::string>())
+    class_<BeaconService>("BeaconService", init<optional<std::string> >())
             .def("scan", &BeaconService::scan)
             .def("start_advertising", &BeaconService::start_advertising,
                     start_advertising(
