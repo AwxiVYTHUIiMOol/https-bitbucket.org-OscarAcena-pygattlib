@@ -68,6 +68,10 @@ public:
 	void write_by_handle_async(uint16_t handle, std::string data, GATTResponse* response);
     boost::python::list write_by_handle(uint16_t handle, std::string data);
 
+    boost::python::list discover_primary();
+    void discover_primary_all(GATTResponse* response);
+    void discover_characteristics(GATTResponse* response, int start = 0x0001, int end = 0xffff, std::string uuid = "");
+
 	friend void connect_cb(GIOChannel*, GError*, gpointer);
 	friend gboolean disconnect_cb(GIOChannel* channel, GIOCondition cond, gpointer userp);
 	friend void events_handler(const uint8_t* data, uint16_t size, gpointer userp);

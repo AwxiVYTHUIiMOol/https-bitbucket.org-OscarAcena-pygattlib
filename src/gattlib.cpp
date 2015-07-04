@@ -407,3 +407,102 @@ GATTRequester::check_channel() {
         }
     }
 }
+
+static void
+discover_primary_cb(guint8 status, GSList *services, void *userp) {
+
+    if (userp == NULL) {
+        throw std::runtime_error(std::string("No user pointer from discover primary"));
+    }
+    if (status) {
+        throw std::runtime_error(std::string(att_ecode2str(status)));
+    }
+
+    if (services == NULL) {
+        throw std::runtime_error("No primary service found");
+    }
+
+    GATTResponse* response = (GATTResponse*)userp;
+
+    for (GSList *l = services; l; l = l->next) {
+        struct gatt_primary *prim = (gatt_primary*)l->data;
+
+        std::stringstream value;
+        value << "Attr_handle:"<<std::hex<<std::showbase<< prim->range.start;
+        value <<",End_handle:"<<std::hex<<std::showbase<< prim->range.end;
+        value<<",UUID:"<<prim->uuid;
+
+        response->on_response(value.str());
+    }
+
+    response->notify(status);
+}
+
+void
+GATTRequester::discover_primary_all(GATTResponse* response) {
+    check_channel();
+    gatt_discover_primary(_attrib, NULL, discover_primary_cb, (gpointer)response);
+}
+
+
+boost::python::list GATTRequester::discover_primary() {
+    GATTResponse response;
+    discover_primary_all(&response);
+
+    if (not response.wait(5*MAX_WAIT_FOR_PACKET))
+        // FIXME: now, response is deleted, but is still registered on
+        // GLIB as callback!!
+        throw std::runtime_error("Device is not responding!");
+
+    return response.received();
+}
+
+
+/* Characteristics Discovery */
+
+static void
+discover_char_cb(guint8 status, GSList *characteristics, void *user_data) {
+
+    if (user_data == NULL) {
+        throw std::runtime_error(std::string("No user pointer from discover primary"));
+    }
+    if (status) {
+        throw std::runtime_error(std::string(att_ecode2str(status)));
+    }
+
+    if (characteristics == NULL) {
+        throw std::runtime_error("No characteristics found");
+    }
+
+    GATTResponse* response = (GATTResponse*) user_data;
+
+    for (GSList *l = characteristics; l; l = l->next) {
+        struct gatt_char *chars = (gatt_char*) l->data;
+        std::stringstream value;
+        value << "Attr_handle:" << chars->handle << ",";
+        value << "properties:" << chars->properties << ",";
+        value << "value handle:"  << chars->value_handle << ",";
+        value << "UUID:" << chars->uuid;
+
+        response->on_response(value.str());
+    }
+
+    response->notify(status);
+
+}
+
+void GATTRequester::discover_characteristics(GATTResponse* response, int start,
+        int end, std::string uuid_str) {
+
+    bt_uuid_t uuid;
+    check_channel();
+    if (uuid_str.size() == 0) {
+        gatt_discover_char(_attrib, start, end, NULL, discover_char_cb,
+                (gpointer) response);
+    } else if (bt_string_to_uuid(&uuid, uuid_str.c_str()) < 0) {
+        throw std::runtime_error(std::string("Invalid UUID"));
+    } else {
+        gatt_discover_char(_attrib, start, end, &uuid, discover_char_cb,
+                (gpointer) response);
+    }
+}
